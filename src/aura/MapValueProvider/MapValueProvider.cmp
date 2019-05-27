@@ -1,0 +1,19 @@
+<aura:component description="MapValueProvider">
+
+    <aura:handler name="init" value="{!this}" action="{!c.setNewBody}"/>
+    <aura:handler name="change" value="{!v.map}" action="{!c.setNewBody}"/>
+    <aura:handler name="change" value="{!v.key}" action="{!c.setNewBody}"/>
+
+    <aura:attribute name="body" type="Aura.ComponentDefRef[]"/>
+    <aura:attribute name="newBody" type="Aura.Component[]"/>
+
+    <aura:attribute name="map" type="Map" access="public"/>
+    <aura:attribute name="key" type="String" access="public"/>
+
+    <aura:attribute name="var" type="String" access="public"/>
+
+    <aura:attribute name="returnValue" type="Object" access="private"/>
+
+    {!v.newBody}
+
+</aura:component>
