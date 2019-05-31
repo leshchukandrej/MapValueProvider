@@ -16,4 +16,4 @@ Example of using this component:
 </c:MapValueProvider>
 ```
      
-This component has handlers that checks if map or key was changed and reloads value for specific map.
+This component has handler that checks if key was changed and reloads value for specific map.
