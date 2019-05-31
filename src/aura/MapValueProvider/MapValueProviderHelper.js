@@ -28,8 +28,8 @@
 
         helper.forEach(component.get('v.body'), cmpDefRef => {
             let valueProvider = helper.getValueProvider(cmpDefRef);
-            //if it's first level of MapValueProvider than valueProvider is not null
-            // othervise we should override it with passed from higher hierarcy MapValueProvider
+            //if it's first level of MapValueProvider then valueProvider is not null
+            // otherwise we should override it with passed from higher hierarcy MapValueProvider
             if (!valueProvider) {
                 valueProvider = component.get('v.valueProvider.value');
             }
