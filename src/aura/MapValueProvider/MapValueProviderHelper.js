@@ -3,7 +3,7 @@
     setNewBody: function (component) {
         try {
             let bodyCmps = this.getBodyCmps(component);
-            if (!bodyCmps) {
+            if (!bodyCmps || bodyCmps.length === 0) {
                 return
             }
             $A.createComponents(bodyCmps, function (newBody) {
@@ -15,20 +15,8 @@
     },
 
     getBodyCmps: function (component) {
-        // if (this.isValueNotUpdated(component)) {
-        //     return;
-        // }
-
-        if (!component.get('v.map') || !component.get('v.key')) {
-            return;
-        }
-
-        let previousKey = component.get('v.previousKey') //todo
-
-        if (previousKey === component.get('v.key')) {
-            return;
-        }
-
+        let previousKey = component.get('v.previousKey');
+        //overrides previous key to current
         component.set('v.previousKey', component.get('v.key'))
 
         return this.generateTemplateElements(component, previousKey);
@@ -40,6 +28,12 @@
 
         helper.forEach(component.get('v.body'), cmpDefRef => {
             let valueProvider = helper.getValueProvider(cmpDefRef);
+            //if it's first level of MapValueProvider than valueProvider is not null
+            // othervise we should override it with passed from higher hierarcy MapValueProvider
+            if (!valueProvider) {
+                valueProvider = component.get('v.valueProvider.value');
+            }
+            //override temp binding with name varName to real value
             helper.setChildComponentDefRef(component, cmpDefRef, valueProvider, component.get('v.var'), previousKey);
             let newCmp = helper.genNewCmp(cmpDefRef);
             newCmps.push(newCmp);
@@ -52,34 +46,47 @@
         let helper = this;
         let values = componentDefRef.attributes.values;
         let key = component.get('v.key');
+        let mapFullPath = helper.getMapFullPath(component, valueProvider);
 
         for (let tempKey in values) {
 
             let tempValue = values[tempKey];
-            let tempPath = tempValue.value.path;
-            let path = helper.getConvertedPath(tempPath);
-            let isVarNameInPath = helper.isVarNameInPath(path, varName);
+            let path = helper.getPathAsString(tempValue.value.path);
 
-            if (tempKey !== 'body' && !tempPath && typeof(tempValue.value) === 'object') {
-                let ref = tempValue.value.toString();
-                path = ref.substring(ref.indexOf('{!')+2, ref.indexOf('}'));
-                if (path == 'v.map.' + previousKey) {
-                    component.set(path.replace(varName, 'v.map[' + key + ']'), component.getReference(path.replace(varName, 'v.map[' + key + ']')))
+            //if such tempValue is already reffered to real value,
+            // we need to check if such path was changed when key was changed
+            if (tempKey !== 'body' && !path && typeof (tempValue.value) === 'object') {
+                if (!tempValue.value.getExpression) {
+                    //get first {!<path>} from path
+                    let ref = tempValue.value.toString().match(/\{\!(.*?)\}/);
+                    path = ref ? ref[1] : path;
                 }
-                continue
+                let pathSuffix = helper.getPathSuffix(path, mapFullPath + previousKey);
+                if (pathSuffix !== null) {
+                    tempValue.value = valueProvider.getReference(mapFullPath + key + pathSuffix);
+                    continue
+                }
             }
 
-            if (tempKey === 'body' || !path || (Array.isArray(tempPath) && !isVarNameInPath)) {
-                continue;
-            }
+            if (tempKey === 'body' || !path) {continue;}
 
-            if (isVarNameInPath) {
-                tempValue.value = component.getReference(path.replace(varName, 'v.map[' + key + ']'));
+            let pathSuffix = helper.getPathSuffix(path, varName);
+
+            if (pathSuffix !== null) {
+                let provider = valueProvider ? valueProvider : component;
+                tempValue.value = provider.getReference(mapFullPath + key + pathSuffix);
             } else if (valueProvider) {
                 tempValue.value = valueProvider.getReference(path);
             }
         }
 
+        //if componentDefRef is MapValueProvider, inject mapFullPath and valueProvider
+        if (values.map && componentDefRef.componentDef.descriptor === 'markup://' + component.getType()) {
+            values.mapFullPath = {value: mapFullPath + key}
+            values.valueProvider = {value: valueProvider}
+        }
+
+        //if componentDefRef contains body, set all body values
         if (values.body) {
             helper.forEach(values.body.value, cmpDefRef => {
                 helper.setChildComponentDefRef(component, cmpDefRef, valueProvider, varName, previousKey);
@@ -87,42 +94,43 @@
         }
     },
 
-    genNewCmp: function(cmpDefRef) {
+    getMapFullPath: function(component, valueProvider) {
+        let mapFullPath = component.get('v.mapFullPath.value');
+        if (mapFullPath) {
+            return mapFullPath + '.';
+        }
+
+        let componentType = component.getType()
+        let varName = component.get('v.var');
+        return this.getMapFullPathFromValueProvider(componentType, valueProvider, varName) + '.';
+    },
+
+    getMapFullPathFromValueProvider: function (componentType, valueProvider, varName) {
+        let facetValues = valueProvider.getDef().getFacets()[0].value;
+        let mapValueProviderFacet = facetValues.find(facetValue => {
+            return facetValue.componentDef.descriptor === 'markup://' + componentType
+                && facetValue.attributes.values.var.value === varName;
+        })
+        return mapValueProviderFacet.attributes.values.map.value.path;
+    },
+
+    //if tempPath in path return pathSuffix array
+    getPathSuffix: function(path, tempPath) {
+        let match = path ? path.replace(tempPath, '').match(/^$|^\./) : null;
+        return match ? match.input : null;
+    },
+
+    genNewCmp: function (cmpDefRef) {
         let cmpDef = cmpDefRef.componentDef.descriptor;
         let cmpValues = cmpDefRef.attributes.values;
 
         return [cmpDef, cmpValues];
     },
 
-    getConvertedPath: function(tempPath) {
+    getPathAsString: function (tempPath) {
         if (tempPath) {
             return Array.isArray(tempPath) ? tempPath.join('.') : tempPath;
         }
-    },
-
-    isVarNameInPath: function (path, varName) {
-        if (path) {
-            return path.split('.')[0] === varName;
-        }
-    },
-
-    isValueNotUpdated: function (component) {
-        let value = this.fetchMapValue(component);
-        let oldValue = component.get('v.returnValue');
-
-        if (this.isValuesAreSame(value, oldValue)) {
-            return true;
-        }
-
-        // component.set('v.returnValue', value);
-    },
-
-    isValuesAreSame: function (value, oldValue) {
-        if (oldValue === null) {
-            oldValue = undefined;
-        }
-
-        return JSON.stringify(oldValue) === JSON.stringify(value);
     },
 
     forEach: function (arr, func) {
@@ -131,20 +139,6 @@
         }
         for (let i = 0; i < arr.length; i++) {
             func(arr[i]);
-        }
-    },
-
-    fetchMapValue: function (component) {
-        let map = component.get('v.map');
-        let key = component.get('v.key');
-
-        return this.getValue(map, key, component);
-    },
-
-    getValue: function (map, key, component) {
-        if (map && key) {
-            return (map instanceof Map) ? map.get(key) : map[key];
-            // return component.getReference('v.map[' + key + ']');
         }
     },
 
