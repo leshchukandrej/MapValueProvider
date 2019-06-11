@@ -31,7 +31,7 @@
         if (body.length === 0) {
             return;
         }
-        let valueProvider = component.get('v.valueProvider.value') ? component.get('v.valueProvider.value') : helper.getValueProvider(body[0]);
+        let valueProvider = helper.getValueProvider(component);
 
         helper.forEach(component.get('v.body'), cmpDefRef => {
             helper.setChildComponentDefRef(component, cmpDefRef, valueProvider, previousKey);
@@ -48,37 +48,26 @@
         const varName = component.get('v.var');
         const key = component.get('v.key');
         const mapFullPath = helper.getMapFullPath(component, valueProvider);
-        const valueProviderDefs = !component.get('v.mapFullPath.value') ? valueProvider.getDef().getAttributeDefs() : null;
+        const valueProviderDefs = valueProvider.getDef().getAttributeDefs();
+        const componentDescriptor = componentDefRef.componentDef.descriptor;
 
         for (let tempKey in values) {
 
-            let tempValue = values[tempKey];
+            const tempValue = values[tempKey];
             let path = helper.getPathAsString(tempValue.value.path);
-
-            //if such tempValue is already reffered to real value,
-            // we need to check if such path was changed when key was changed
-            if (tempKey !== 'body' && !path && typeof (tempValue.value) === 'object') {
-                if (!tempValue.value.getExpression) {
-                    //get first {!<path>} from path
-                    let ref = tempValue.value.toString().match(/\{\!(.*?)\}/);
-                    path = ref ? ref[1] : path;
-                }
-                let pathSuffix = helper.getPathSuffix(path, mapFullPath + previousKey);
-                if (pathSuffix !== null) {
-                    tempValue.value = valueProvider.getReference(mapFullPath + key + pathSuffix);
-                    continue
-                }
-            }
 
             if (tempKey === 'body' || !path) {
                 continue;
             }
 
-            let pathSuffix = helper.getPathSuffix(path, varName);
+            let pathSuffix = tempValue.varName === varName ?
+                helper.getPathSuffix(path, mapFullPath + previousKey)
+                :
+                helper.getPathSuffix(path, varName);
 
             if (pathSuffix !== null) {
-                // let provider = valueProvider ? valueProvider : component;
                 tempValue.value = valueProvider.getReference(mapFullPath + key + pathSuffix);
+                tempValue.varName = tempValue.varName ? tempValue.varName : varName;
                 continue;
             }
 
@@ -89,16 +78,13 @@
             }
         }
 
-        //if componentDefRef is MapValueProvider, inject mapFullPath and valueProvider
-        if (values.map && componentDefRef.componentDef.descriptor === 'markup://' + component.getType()) {
-            values.mapFullPath = {value: mapFullPath + key}
-
-            if (!values.valueProvider) {
-                values.valueProvider = {value: valueProvider}
-            }
+//if componentDefRef is MapValueProvider, inject mapFullPath and valueProvider
+        if (values.map && componentDescriptor === 'markup://' + component.getType()) {
+            let superId = component.get('v.superId');
+            values.superId = superId ? superId : {value: component.getGlobalId()}
         }
 
-        //if componentDefRef contains body, set all body values
+//if componentDefRef contains body, set all body values
         if (values.body) {
             helper.forEach(values.body.value, cmpDefRef => {
                 helper.setChildComponentDefRef(component, cmpDefRef, valueProvider, previousKey);
@@ -107,11 +93,6 @@
     },
 
     getMapFullPath: function (component, valueProvider) {
-        let mapFullPath = component.get('v.mapFullPath.value');
-        if (mapFullPath) {
-            return mapFullPath + '.';
-        }
-
         return this.getMapFullPathFromValueProvider(component, valueProvider) + '.';
     },
 
@@ -122,7 +103,7 @@
         return componentReference.wb.t.A.map.getExpression();
     },
 
-//if tempPath in path return pathSuffix array
+    //if tempPath in path return pathSuffix array
     getPathSuffix: function (path, tempPath) {
         let match = path ? path.replace(tempPath, '').match(/^$|^\./) : null;
         return match ? match.input : null;
@@ -150,8 +131,16 @@
         }
     },
 
-    getValueProvider: function (componentDefRef) {
+    getValueProvider: function (component) {
+        let superId = component.get('v.superId.value');
+        if (superId) {
+            return this.getValueProviderFromBody($A.getComponent(superId));
+        }
+        return this.getValueProviderFromBody(component);
+    },
+
+    getValueProviderFromBody: function (component) {
+        let componentDefRef = component.get('v.body')[0];
         return componentDefRef.attributes.valueProvider;
-    }
     },
 })

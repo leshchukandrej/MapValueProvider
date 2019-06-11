@@ -10,9 +10,10 @@
     <aura:attribute name="key" type="String" access="public"/>
     <aura:attribute name="previousKey" type="String"/>
 
-    <aura:attribute name="valueProvider" type="Object"/>
-    <aura:attribute name="mapFullPath" type="String"/>
+    <!--<aura:attribute name="valueProvider" type="Object"/>-->
+    <!--<aura:attribute name="mapFullPath" type="String"/>-->
 
+    <aura:attribute name="superId" type="String"/>
 
     <aura:attribute name="var" type="String" access="public"/>
 
