@@ -4,18 +4,15 @@
     <aura:handler name="change" value="{!v.key}" action="{!c.setNewBody}"/>
 
     <aura:attribute name="body" type="Aura.ComponentDefRef[]"/>
-    <aura:attribute name="newBody" type="Aura.Component[]"/>
+    <aura:attribute name="newBody" type="Aura.Component[]" access="private"/>
 
-    <aura:attribute name="map" type="Map" access="public"/>
-    <aura:attribute name="key" type="String" access="public"/>
-    <aura:attribute name="previousKey" type="String"/>
-
-    <!--<aura:attribute name="valueProvider" type="Object"/>-->
-    <!--<aura:attribute name="mapFullPath" type="String"/>-->
+    <aura:attribute name="map" type="Map" access="public" required="true"/>
+    <aura:attribute name="key" type="String" access="public" required="true"/>
+    <aura:attribute name="previousKey" type="String" access="private"/>
 
     <aura:attribute name="superId" type="String"/>
 
-    <aura:attribute name="var" type="String" access="public"/>
+    <aura:attribute name="var" type="String" access="public" required="true"/>
 
     {!v.newBody}
 

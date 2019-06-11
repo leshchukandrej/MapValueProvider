@@ -16,7 +16,6 @@
 
     getBodyCmps: function (component) {
         let previousKey = component.get('v.previousKey');
-        //overrides previous key to current
         component.set('v.previousKey', component.get('v.key'))
 
         return this.generateTemplateElements(component, previousKey);
@@ -33,7 +32,7 @@
         }
         let valueProvider = helper.getValueProvider(component);
 
-        helper.forEach(component.get('v.body'), cmpDefRef => {
+        helper.forEach(body, cmpDefRef => {
             helper.setChildComponentDefRef(component, cmpDefRef, valueProvider, previousKey);
             let newCmp = helper.genNewCmp(cmpDefRef);
             newCmps.push(newCmp);
@@ -49,16 +48,17 @@
         const key = component.get('v.key');
         const mapFullPath = helper.getMapFullPath(component, valueProvider);
         const valueProviderDefs = valueProvider.getDef().getAttributeDefs();
-        const componentDescriptor = componentDefRef.componentDef.descriptor;
+        const cmpDefDescriptor = componentDefRef.componentDef.descriptor;
 
         for (let tempKey in values) {
 
             const tempValue = values[tempKey];
-            let path = helper.getPathAsString(tempValue.value.path);
 
-            if (tempKey === 'body' || !path) {
+            if (tempKey === 'body' || !tempValue.value.path) {
                 continue;
             }
+
+            let path = helper.getPathAsString(tempValue.value.path);
 
             let pathSuffix = tempValue.varName === varName ?
                 helper.getPathSuffix(path, mapFullPath + previousKey)
@@ -68,23 +68,21 @@
             if (pathSuffix !== null) {
                 tempValue.value = valueProvider.getReference(mapFullPath + key + pathSuffix);
                 tempValue.varName = tempValue.varName ? tempValue.varName : varName;
-                continue;
-            }
-
-            if (valueProviderDefs && path.match(/^v\./)) {
+            } else if (path.match(/^v\./)) {
                 if (valueProviderDefs.getDef(path.substring(2, path.length))) {
                     tempValue.value = valueProvider.getReference(path);
                 }
             }
         }
 
-//if componentDefRef is MapValueProvider, inject mapFullPath and valueProvider
-        if (values.map && componentDescriptor === 'markup://' + component.getType()) {
+        //if componentDefRef is MapValueProvider, inject global id
+        //of the highest ParentMapValueProvider
+        if (values.map && cmpDefDescriptor === 'markup://' + component.getType()) {
             let superId = component.get('v.superId');
             values.superId = superId ? superId : {value: component.getGlobalId()}
         }
 
-//if componentDefRef contains body, set all body values
+        //if componentDefRef contains body, set all body values
         if (values.body) {
             helper.forEach(values.body.value, cmpDefRef => {
                 helper.setChildComponentDefRef(component, cmpDefRef, valueProvider, previousKey);
